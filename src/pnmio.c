@@ -55,11 +55,16 @@ void write_binary_1( FILE *f, int *img_out, int x_scaled_size, int y_scaled_size
 // the unit of information is 2 bytes. used for 16 bit grayscale and 48 bit rgb components
 void write_binary_2( FILE *f, int *img_out, int x_scaled_size, int y_scaled_size)
 {
+  char upper;
+  char lower;
   short s;
   for ( int i = 0; i < x_scaled_size * y_scaled_size; ++i )
   {
     s = (short)img_out[i];
-    fwrite(&s, sizeof(short), 1, f ); 
+    upper = s >> 8;
+    lower = s & 0xFF;
+    fwrite(&upper, sizeof(char), 1, f ); 
+    fwrite(&lower, sizeof(char), 1, f ); 
   }  
 }
 
