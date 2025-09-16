@@ -33,6 +33,35 @@
 #define  GREYSCALE_TYPE     0 /* used for PFM */
 #define  RGB_TYPE           1 /* used for PFM */   
 
+void write_ascii( FILE *f, int *img_out, int x_scaled_size, int y_scaled_size, int linevals )
+{
+  for ( int i = 0; i < x_scaled_size * y_scaled_size; ++i )
+  {
+    fprintf(f, "%d ", img_out[i]);
+    if ( i % linevals == linevals-1 )
+      fprintf(f, "\n");
+  }  
+}
+// the unit of information is 1 byte. used for 8 bit grayscale and 24 bit rgb components
+void write_binary_1( FILE *f, int *img_out, int x_scaled_size, int y_scaled_size )
+{
+  char c;
+  for ( int i = 0; i < x_scaled_size * y_scaled_size; ++i )
+  {
+    c = (char)img_out[i];
+    fwrite(&c, sizeof(char), 1, f ); 
+  }  
+}
+// the unit of information is 2 bytes. used for 16 bit grayscale and 48 bit rgb components
+void write_binary_2( FILE *f, int *img_out, int x_scaled_size, int y_scaled_size)
+{
+  short s;
+  for ( int i = 0; i < x_scaled_size * y_scaled_size; ++i )
+  {
+    s = (short)img_out[i];
+    fwrite(&s, sizeof(short), 1, f ); 
+  }  
+}
 
 /* get_pnm_type:
  * Read the header contents of a PBM/PGM/PPM/PFM file up to the point of 
@@ -482,40 +511,40 @@ void write_pbm_file(FILE *f, int *img_out,
   int x_size, int y_size, int x_scale_val, int y_scale_val, int linevals,
   int is_ascii)
 {
-  int i, j, x_scaled_size, y_scaled_size;
-  int k, v, temp, step;
- 
-  x_scaled_size = x_size * x_scale_val;
-  y_scaled_size = y_size * y_scale_val; 
-  /* Write the magic number string. */
-  if (is_ascii == 1) {
-    fprintf(f, "P1\n");
-	step = 1;
-  } else {
-    fprintf(f, "P4\n");
-	step = 8;
-  }
-  /* Write the image dimensions. */
-  fprintf(f, "%d %d\n", x_scaled_size, y_scaled_size);
-  
-  /* Write the image data. */
-  for (i = 0; i < y_scaled_size; i++) {
-    for (j = 0; j < x_scaled_size; j+=step) {
-	    if (is_ascii == 1) {
-        fprintf(f, "%d ", img_out[i*x_scaled_size+j]);
-	    } else {
-	      temp = 0;
-		    for (k = 0; k < 8; k++) {
-          v = img_out[i*x_scaled_size+j+k];
-          temp |= (v << (7-k));
-		    }
-        fprintf(f, "%c", temp);
-      }
-      if (((i*x_scaled_size+j) % linevals) == (linevals-1)) {
-        fprintf(f, "\n");
-      }
-    }
-  }   
+	int i, j, x_scaled_size, y_scaled_size;
+	int k, v, temp, step;
+
+	x_scaled_size = x_size * x_scale_val;
+	y_scaled_size = y_size * y_scale_val; 
+	/* Write the magic number string. */
+	if (is_ascii == 1) {
+		fprintf(f, "P1\n");
+		step = 1;
+	} else {
+		fprintf(f, "P4\n");
+		step = 8;
+	}
+	/* Write the image dimensions. */
+	fprintf(f, "%d %d\n", x_scaled_size, y_scaled_size);
+
+	/* Write the image data. */
+	for (i = 0; i < y_scaled_size; i++) {
+		for (j = 0; j < x_scaled_size; j+=step) {
+			if (is_ascii == 1) {
+				fprintf(f, "%d ", img_out[i*x_scaled_size+j]);
+			} else {
+				temp = 0;
+				for (k = 0; k < 8; k++) {
+					v = img_out[i*x_scaled_size+j+k];
+					temp |= (v << (7-k));
+				}
+				fprintf(f, "%c", temp);
+			}
+			if (((i*x_scaled_size+j) % linevals) == (linevals-1)) {
+				fprintf(f, "\n");
+			}
+		}
+	}   
 }
 
 /* write_pgm_file:
@@ -525,7 +554,7 @@ void write_pgm_file(FILE *f, int *img_out,
   int x_size, int y_size, int x_scale_val, int y_scale_val, 
   int img_colors, int linevals, int is_ascii)
 {
-  int i, j, x_scaled_size, y_scaled_size;
+  int x_scaled_size, y_scaled_size;
  
   x_scaled_size = x_size * x_scale_val;
   y_scaled_size = y_size * y_scale_val; 
@@ -541,18 +570,21 @@ void write_pgm_file(FILE *f, int *img_out,
   fprintf(f, "%d\n", img_colors);
   
   /* Write the image data. */
-  for (i = 0; i < y_scaled_size; i++) {
-    for (j = 0; j < x_scaled_size; j++) {
-      if (is_ascii == 1) {
-        fprintf(f, "%d ", img_out[i*x_scaled_size+j]);
-        if (((i*x_scaled_size+j) % linevals) == (linevals-1)) {
-          fprintf(f, "\n");
-        }
-      } else {
-        fprintf(f, "%c", img_out[i*x_scaled_size+j]);
-      }
+  if ( is_ascii )
+  {
+    write_ascii(f, img_out, x_scaled_size, y_scaled_size, linevals ); 
+  }
+  else
+  {
+    if ( img_colors < 256 )
+    {
+      write_binary_1(f, img_out, x_scaled_size, y_scaled_size);
     }
-  } 
+    else
+    {
+      write_binary_2(f, img_out, x_scaled_size, y_scaled_size);
+    }
+  }
 }
 
 /* write_ppm_file:
@@ -562,7 +594,7 @@ void write_ppm_file(FILE *f, int *img_out,
   int x_size, int y_size, int x_scale_val, int y_scale_val, 
   int img_colors, int is_ascii)
 {
-  int i, j, x_scaled_size, y_scaled_size;
+  int x_scaled_size, y_scaled_size;
   
   x_scaled_size = x_size * x_scale_val;
   y_scaled_size = y_size * y_scale_val;
@@ -576,24 +608,20 @@ void write_ppm_file(FILE *f, int *img_out,
   fprintf(f, "%d %d\n", x_scaled_size, y_scaled_size);
   /* Write the maximum color/grey level allowed. */
   fprintf(f, "%d\n", img_colors);
-  
-  /* Write the image data. */
-  for (i = 0; i < y_scaled_size; i++) {
-    for (j = 0; j < x_scaled_size; j++) {
-      if (is_ascii == 1) {
-        fprintf(f, "%d %d %d ", 
-          img_out[3*(i*x_scaled_size+j)+0], 
-          img_out[3*(i*x_scaled_size+j)+1], 
-          img_out[3*(i*x_scaled_size+j)+2]);
-        if ((j % 4) == 0) {
-          fprintf(f, "\n");
-        }
-      } else {
-        fprintf(f, "%c%c%c", 
-          img_out[3*(i*x_scaled_size+j)+0], 
-          img_out[3*(i*x_scaled_size+j)+1], 
-          img_out[3*(i*x_scaled_size+j)+2]);
-      }
+ 
+  if ( is_ascii )
+  {
+    write_ascii(f, img_out, x_scaled_size, y_scaled_size*3, x_scaled_size*3 );
+  }
+  else
+  {
+    if ( img_colors < 256 )
+    {
+      write_binary_1(f, img_out, x_scaled_size, y_scaled_size*3);
+    }
+    else
+    {
+      write_binary_2(f, img_out, x_scaled_size, y_scaled_size*3);
     }
   }  
 }
